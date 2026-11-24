@@ -38,7 +38,6 @@ def lambda_handler(event, context):
     metadata_repository = S3MetadataRepository(
         s3_client=s3,
         bucket_name=os.environ["METADATA_BUCKET"],
-        metadata_prefix=os.environ["METADATA_PREFIX"],
     )
 
     use_case = ExecuteDatasetUseCase(
