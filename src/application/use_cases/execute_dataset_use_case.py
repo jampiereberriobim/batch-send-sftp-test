@@ -138,11 +138,7 @@ class ExecuteDatasetUseCase:
     @staticmethod
     def _format_date_template(template: str, execution_date: date) -> str:
         replacements = {
-            "{date}": execution_date.strftime("%Y-%m-%d"),
-            "{yyyy}": execution_date.strftime("%Y"),
-            "{MM}": execution_date.strftime("%m"),
-            "{dd}": execution_date.strftime("%d"),
-            "{yyyyMMdd}": execution_date.strftime("%Y%m%d"),
+            "{YYYY-MM-DD}": execution_date.strftime("%Y-%m-%d"),
         }
         result = template
         for token, value in replacements.items():
@@ -155,10 +151,7 @@ class ExecuteDatasetUseCase:
         dataset: Dataset,
     ) -> list[str]:
         template = dataset.date_template or ""
-        has_date_token = any(
-            token in template
-            for token in ("{date}", "{yyyy}", "{MM}", "{dd}", "{yyyyMMdd}")
-        )
+        has_date_token = "{YYYY-MM-DD}" in template
 
         if not has_date_token:
             prefix_parts = [
