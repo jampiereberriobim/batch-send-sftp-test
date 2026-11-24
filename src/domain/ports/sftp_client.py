@@ -1,50 +1,28 @@
 from abc import ABC, abstractmethod
 from typing import BinaryIO
 
-from src.domain.entities.remote_file import RemoteFile
 from src.domain.entities.sftp_credentials import SftpCredentials
 
 
 class SftpClient(ABC):
-    """
-    Contract for SFTP operations.
-    """
+    """Port for writing files to an SFTP destination."""
 
     @abstractmethod
-    def connect(
-        self,
-        credentials: SftpCredentials
-    ) -> None:
-        """
-        Opens an SFTP connection.
-        """
-        pass
+    def connect(self, credentials: SftpCredentials) -> None:
+        """Open an SFTP connection."""
+        raise NotImplementedError
 
     @abstractmethod
     def disconnect(self) -> None:
-        """
-        Closes the SFTP connection.
-        """
-        pass
+        """Close the SFTP connection."""
+        raise NotImplementedError
 
     @abstractmethod
-    def list_files(
+    def upload(
         self,
+        file_stream: BinaryIO,
         remote_path: str,
-        pattern: str,
-        recursive: bool
-    ) -> list[RemoteFile]:
-        """
-        Lists remote files.
-        """
-        pass
-
-    @abstractmethod
-    def download(
-        self,
-        remote_file: RemoteFile
-    ) -> BinaryIO:
-        """
-        Downloads a remote file.
-        """
-        pass
+        filename: str,
+    ) -> str:
+        """Upload a stream into the configured remote directory."""
+        raise NotImplementedError
