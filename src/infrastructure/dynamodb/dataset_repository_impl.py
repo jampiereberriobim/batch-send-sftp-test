@@ -30,8 +30,12 @@ class DatasetRepositoryImpl(DatasetRepository):
             name=item["dataset"],
             source_bucket=item["source_bucket"],
             source_prefix=item.get("source_prefix", ""),
-            date_template=item.get("date_template", ""),
             remote_path=item["remote_path"],
             enabled=item["enabled"],
+            source_date_template=item.get("source_date_template", ""),
+            source_suffix=item.get("source_suffix", ""),
+            destination_date_template=item.get(
+                "destination_date_template", ""
+            ),
             recursive=item.get("recursive", False),
         )
