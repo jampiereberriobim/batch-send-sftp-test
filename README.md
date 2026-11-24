@@ -24,19 +24,51 @@ Example dataset item in DynamoDB JSON attribute format:
 ```json
 {
   "integration": {"S": "compartamos_sftp"},
-  "dataset": {"S": "transaction"},
+  "dataset": {"S": "user_balances"},
   "source_bucket": {"S": "qa-datalake-golden-reporte-final-zone-992382450203"},
   "source_prefix": {"S": "FCOMPARTAMOS/"},
-  "date_template": {"S": "{YYYY-MM-DD}/USER-BALANCES/"},
-  "remote_path": {"S": "/entrada/processed"},
+  "source_date_template": {"S": "{YYYY-MM-DD}"},
+  "source_suffix": {"S": "/USER-BALANCES/"},
+  "remote_path": {"S": "/entrada/processed/"},
+  "destination_date_template": {"S": "{YYYY-MM-DD}"},
   "enabled": {"BOOL": true},
   "recursive": {"BOOL": false}
 }
 ```
 
-The `{YYYY-MM-DD}` token is replaced with the execution date formatted as `YYYY-MM-DD`. For example, with `source_prefix = FCOMPARTAMOS/` and `date_template = {YYYY-MM-DD}/USER-BALANCES/`, the resolved S3 prefix for November 22, 2026 is `FCOMPARTAMOS/2026-11-22/USER-BALANCES/`. If the date template does not contain `{YYYY-MM-DD}`, its path is processed once.
+### Source path
 
-When `start_date` and `end_date` are omitted, the current date is processed. For a date range, provide both dates in ISO format (`YYYY-MM-DD`).
+The S3 source prefix is composed in this order:
+
+`source_prefix + source_date_template + source_suffix`
+
+For example, with `source_prefix = FCOMPARTAMOS/`, `source_date_template = {YYYY-MM-DD}`, and `source_suffix = /USER-BALANCES/`, the resolved S3 prefix for November 22, 2026 is:
+
+`FCOMPARTAMOS/2026-11-22/USER-BALANCES/`
+
+### SFTP destination path
+
+The SFTP destination is composed independently:
+
+`remote_path + destination_date_template`
+
+For example, with `remote_path = /entrada/processed/` and `destination_date_template = {YYYY-MM-DD}`, the resolved destination for November 22, 2026 is:
+
+`/entrada/processed/2026-11-22/`
+
+Both date templates are optional and independent:
+
+- If `source_date_template` is omitted or empty, no date partition is added to the S3 source path.
+- If `destination_date_template` is omitted or empty, files are uploaded directly into `remote_path`.
+- The supported date token is `{YYYY-MM-DD}`.
+- If either template contains the date token, the execution iterates through the requested date range. If only the destination template is date-partitioned, the same configured S3 source prefix is read for each requested date and uploaded to each corresponding destination partition.
+
+When `start_date` and `end_date` are omitted, the current date is used if date partitioning is configured. For a date range, provide both dates in ISO format (`YYYY-MM-DD`).
+
+### Recursive listing
+
+- `recursive = false`: only files directly inside the resolved S3 prefix are transferred.
+- `recursive = true`: files in the resolved prefix and all nested folders are transferred.
 
 ## Secrets Manager
 
@@ -65,14 +97,14 @@ Run:
 python test_local.py
 ```
 
-The SFTP destination directory is created if it does not exist. By default, only files directly under each resolved S3 prefix are transferred. Set `recursive` to true to include nested folders.
+The SFTP destination directory is created if it does not exist.
 
 ## Execution event
 
 ```json
 {
   "integration": "compartamos_sftp",
-  "dataset": "transaction",
+  "dataset": "user_balances",
   "start_date": "2026-11-22",
   "end_date": "2026-11-24"
 }
