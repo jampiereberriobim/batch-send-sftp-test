@@ -14,10 +14,12 @@ class StorageClient(ABC):
         prefix: str,
         recursive: bool = False,
     ) -> list[RemoteFile]:
-        """List files under a bucket prefix."""
         raise NotImplementedError
 
     @abstractmethod
-    def download(self, remote_file: RemoteFile) -> BinaryIO:
-        """Download a source file as a binary stream."""
+    def download(
+        self,
+        remote_file: RemoteFile,
+        bucket_name: str,
+    ) -> BinaryIO:
         raise NotImplementedError
