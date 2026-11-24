@@ -47,18 +47,15 @@ class S3StorageClient(StorageClient):
 
         return files
 
-    def download(self, remote_file: RemoteFile) -> BinaryIO:
+    def download(
+        self,
+        remote_file: RemoteFile,
+        bucket_name: str,
+    ) -> BinaryIO:
         response = self._client.get_object(
-            Bucket=self._bucket_for_file(remote_file),
+            Bucket=bucket_name,
             Key=remote_file.path,
         )
         stream = BytesIO(response["Body"].read())
         stream.seek(0)
         return stream
-
-    def _bucket_for_file(self, remote_file: RemoteFile) -> str:
-        # The bucket is attached by the use case before download.
-        bucket_name = getattr(remote_file, "bucket_name", None)
-        if not bucket_name:
-            raise ValueError("Source bucket is missing from the source file.")
-        return bucket_name
