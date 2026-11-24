@@ -27,14 +27,14 @@ Example dataset item in DynamoDB JSON attribute format:
   "dataset": {"S": "transaction"},
   "source_bucket": {"S": "qa-datalake-golden-reporte-final-zone-992382450203"},
   "source_prefix": {"S": "FCOMPARTAMOS/"},
-  "date_template": {"S": "{date}/USER-BALANCES/"},
+  "date_template": {"S": "{YYYY-MM-DD}/USER-BALANCES/"},
   "remote_path": {"S": "/entrada/processed"},
   "enabled": {"BOOL": true},
   "recursive": {"BOOL": false}
 }
 ```
 
-The `{date}` token is expanded as `YYYY-MM-DD`. Other supported tokens are `{yyyy}`, `{MM}`, `{dd}`, and `{yyyyMMdd}`. If the date template has no date token, its path is processed once.
+The `{YYYY-MM-DD}` token is replaced with the execution date formatted as `YYYY-MM-DD`. For example, with `source_prefix = FCOMPARTAMOS/` and `date_template = {YYYY-MM-DD}/USER-BALANCES/`, the resolved S3 prefix for November 22, 2026 is `FCOMPARTAMOS/2026-11-22/USER-BALANCES/`. If the date template does not contain `{YYYY-MM-DD}`, its path is processed once.
 
 When `start_date` and `end_date` are omitted, the current date is processed. For a date range, provide both dates in ISO format (`YYYY-MM-DD`).
 
