@@ -4,14 +4,9 @@ from datetime import datetime
 
 @dataclass(frozen=True)
 class RemoteFile:
-    """
-    Represents a file available on a remote SFTP server.
-    """
+    """A file discovered in the source object storage."""
 
     name: str
-
     path: str
-
     size: int
-
     modified_at: datetime
