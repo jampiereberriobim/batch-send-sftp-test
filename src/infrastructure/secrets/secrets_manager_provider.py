@@ -20,28 +20,35 @@ class SecretsManagerProvider(SecretProvider):
         response = self._client.get_secret_value(SecretId=secret_name)
         secret_payload = json.loads(response["SecretString"])
 
-        # Support the previous nested secret structure while allowing the
-        # secret itself to contain the SFTP connection fields directly.
+        # Support both the legacy nested structure and a direct JSON object.
         credentials = secret_payload.get("sftp_qa_2", secret_payload)
         if isinstance(credentials, str):
             credentials = json.loads(credentials)
 
-        required_fields = ("host", "port", "username", "private_key")
+        required_fields = ("host", "port", "username")
         missing_fields = [
             field for field in required_fields
             if not credentials.get(field)
         ]
         if missing_fields:
             raise ValueError(
-                "SFTP secret is missing required SSH fields: "
+                "SFTP secret is missing required fields: "
                 + ", ".join(missing_fields)
+            )
+
+        private_key = credentials.get("private_key")
+        password = credentials.get("password")
+        if not private_key and not password:
+            raise ValueError(
+                "SFTP secret must provide either 'private_key' or 'password'."
             )
 
         return SftpCredentials(
             host=credentials["host"],
             port=int(credentials["port"]),
             username=credentials["username"],
-            private_key=credentials["private_key"],
+            password=password,
+            private_key=private_key,
             private_key_passphrase=credentials.get(
                 "private_key_passphrase"
             ),
