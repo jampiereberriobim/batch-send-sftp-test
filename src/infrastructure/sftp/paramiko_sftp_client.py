@@ -35,7 +35,7 @@ class ParamikoSftpClient(SftpClient):
         ):
             try:
                 return key_cls.from_private_key(
-                    StringIO(normalized_key + "\\n"),
+                    StringIO(normalized_key.rstrip() + "\n"),
                     password=passphrase,
                 )
             except Exception:
