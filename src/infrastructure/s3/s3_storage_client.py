@@ -1,66 +1,64 @@
+from io import BytesIO
 from typing import BinaryIO
-from datetime import datetime
 
 from botocore.client import BaseClient
 
 from src.domain.entities.remote_file import RemoteFile
 from src.domain.ports.storage_client import StorageClient
-
 from src.infrastructure.aws.s3_client import S3Client
 
 
 class S3StorageClient(StorageClient):
-    """
-    AWS S3 implementation of StorageClient.
-    """
+    """AWS S3 adapter used to list and download source files."""
 
-    def __init__(
-        self,
-        s3_client: S3Client,
-        bucket_name: str,
-    ) -> None:
-
+    def __init__(self, s3_client: S3Client) -> None:
         self._client: BaseClient = s3_client.client
-        self._bucket_name = bucket_name
 
-    def upload(
+    def list_files(
         self,
-        file_stream: BinaryIO,
-        remote_file: RemoteFile,
-        integration: str,
-        destination_prefix: str,
-    ) -> str:
+        bucket_name: str,
+        prefix: str,
+        recursive: bool = False,
+    ) -> list[RemoteFile]:
+        paginator = self._client.get_paginator("list_objects_v2")
+        files: list[RemoteFile] = []
+        normalized_prefix = prefix.lstrip("/")
 
-        object_key = self._build_object_key(
-            integration=integration,
-            destination_prefix=destination_prefix,
-            filename=remote_file.name,
+        for page in paginator.paginate(
+            Bucket=bucket_name,
+            Prefix=normalized_prefix,
+        ):
+            for item in page.get("Contents", []):
+                key = item["Key"]
+                relative_key = key[len(normalized_prefix):]
+                if not recursive and "/" in relative_key.rstrip("/"):
+                    continue
+                if key.endswith("/"):
+                    continue
+
+                files.append(
+                    RemoteFile(
+                        name=key.rsplit("/", 1)[-1],
+                        path=key,
+                        size=item.get("Size", 0),
+                        modified_at=item["LastModified"],
+                    )
+                )
+
+        return files
+
+    def download(self, remote_file: RemoteFile) -> BinaryIO:
+        response = self._client.get_object(
+            Bucket=self._bucket_for_file(remote_file),
+            Key=remote_file.path,
         )
+        stream = BytesIO(response["Body"].read())
+        stream.seek(0)
+        return stream
 
-        self._client.upload_fileobj(
-            Fileobj=file_stream,
-            Bucket=self._bucket_name,
-            Key=object_key,
-        )
-
-        return object_key
-
-    @staticmethod
-    def _build_object_key(
-        integration: str,
-        destination_prefix: str,
-        filename: str,
-    ) -> str:
-
-        now = datetime.utcnow()
-
-        destination_prefix = destination_prefix.strip("/")
-
-        return (
-            f"{integration}/"
-            f"{destination_prefix}/"
-            f"year={now:%Y}/"
-            f"month={now:%m}/"
-            f"day={now:%d}/"
-            f"{filename}"
-        )
+    def _bucket_for_file(self, remote_file: RemoteFile) -> str:
+        # The bucket is attached by the use case before download.
+        bucket_name = getattr(remote_file, "bucket_name", None)
+        if not bucket_name:
+            raise ValueError("Source bucket is missing from the source file.")
+        return bucket_name
