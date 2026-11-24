@@ -9,7 +9,9 @@ class Dataset:
     name: str
     source_bucket: str
     source_prefix: str
-    date_template: str
     remote_path: str
     enabled: bool
+    source_date_template: str = ""
+    source_suffix: str = ""
+    destination_date_template: str = ""
     recursive: bool = False
