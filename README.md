@@ -71,11 +71,13 @@ When `start_date` and `end_date` are omitted, the current date is used if date p
 - `recursive = false`: only files directly inside the resolved S3 prefix are transferred.
 - `recursive = true`: files in the resolved prefix and all nested folders are transferred.
 
-## Secrets Manager and SSH authentication
+## Secrets Manager and SFTP authentication
 
 The integration's `secret_name` references a Secrets Manager secret by name or full ARN.
 
-The secret must contain a JSON object with these fields:
+The secret must contain a JSON object with the connection fields and one of the supported authentication methods.
+
+### SSH private-key authentication
 
 ```json
 {
@@ -87,10 +89,23 @@ The secret must contain a JSON object with these fields:
 }
 ```
 
-- Authentication uses the SSH private key through Paramiko; password authentication is not used.
-- `private_key_passphrase` is optional and is only required when the private key is encrypted.
+### Password authentication
+
+```json
+{
+  "host": "sftp.example.com",
+  "port": 22,
+  "username": "sftp_user",
+  "password": "your-password"
+}
+```
+
+- If `private_key` is present and non-empty, Paramiko uses SSH private-key authentication.
+- Otherwise, if `password` is present and non-empty, Paramiko uses password authentication.
+- At least one of `private_key` or `password` is required.
+- `private_key_passphrase` is optional and is only used when the private key is encrypted.
 - The private key can contain real line breaks or escaped `\\n` sequences.
-- For compatibility, the provider also accepts the previous nested `sftp_qa_2` JSON structure, with the same fields inside it.
+- The provider accepts both a direct JSON object and the legacy nested `sftp_qa_2` structure.
 - Supported private key types: Ed25519, RSA, and ECDSA.
 
 ## Environment variables
