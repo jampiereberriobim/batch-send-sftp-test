@@ -108,12 +108,22 @@ The secret must contain a JSON object with the connection fields and one of the 
 - The provider accepts both a direct JSON object and the legacy nested `sftp_qa_2` structure.
 - Supported private key types: Ed25519, RSA, and ECDSA.
 
+## Execution metadata
+
+Metadata Parquet files are stored in `METADATA_BUCKET` using this structure:
+
+```text
+{integration}/year={YYYY}/month={M}/day={D}/{integration}_{execution_id}_{timestamp}.parquet
+```
+
+The integration name is the first folder directly; no fixed `SFTP/` prefix or dataset folder is added. The execution ID in the filename uses its first 8 hexadecimal characters, and the timestamp uses the execution end time in UTC. Parquet compression remains Snappy.
+
 ## Environment variables
 
 - `DATASET_TABLE`: DynamoDB dataset table.
 - `INTEGRATION_TABLE`: DynamoDB integration table.
 - `METADATA_BUCKET`: S3 bucket for execution metadata.
-- `METADATA_PREFIX`: S3 prefix for execution metadata.
+- Execution metadata is stored under the integration name, followed by Hive-style `year`, `month`, and `day` partitions.
 
 AWS credentials and region use the standard boto3 credential provider chain.
 
