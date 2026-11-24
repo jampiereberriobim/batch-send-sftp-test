@@ -31,7 +31,6 @@ storage_client = S3StorageClient(s3_client=s3)
 metadata_repository = S3MetadataRepository(
     s3_client=s3,
     bucket_name=os.environ["METADATA_BUCKET"],
-    metadata_prefix=os.getenv("METADATA_PREFIX", "BRONZE"),
 )
 
 request = ExecutionRequest(
