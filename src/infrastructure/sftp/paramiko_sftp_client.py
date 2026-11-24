@@ -10,7 +10,7 @@ from src.shared.logger import logger
 
 
 class ParamikoSftpClient(SftpClient):
-    """Paramiko adapter using SSH private-key authentication."""
+    """Paramiko adapter supporting SSH private-key and password authentication."""
 
     def __init__(self) -> None:
         self._transport = None
@@ -54,24 +54,31 @@ class ParamikoSftpClient(SftpClient):
         )
 
         try:
-            if not credentials.private_key:
-                raise ValueError(
-                    "SSH private key is required for SFTP authentication."
-                )
-
-            private_key = self._load_private_key(
-                credentials.private_key,
-                credentials.private_key_passphrase,
-            )
-
             self._transport = paramiko.Transport(
                 (credentials.host, credentials.port)
             )
-            self._transport.connect(
-                username=credentials.username,
-                pkey=private_key,
-            )
-            logger.info("Authenticated to SFTP using SSH private key.")
+
+            if credentials.private_key:
+                private_key = self._load_private_key(
+                    credentials.private_key,
+                    credentials.private_key_passphrase,
+                )
+                self._transport.connect(
+                    username=credentials.username,
+                    pkey=private_key,
+                )
+                logger.info("Authenticated to SFTP using SSH private key.")
+            elif credentials.password:
+                self._transport.connect(
+                    username=credentials.username,
+                    password=credentials.password,
+                )
+                logger.info("Authenticated to SFTP using password.")
+            else:
+                raise ValueError(
+                    "SFTP credentials must include either a private key "
+                    "or a password."
+                )
 
             self._client = paramiko.SFTPClient.from_transport(
                 self._transport
