@@ -161,10 +161,14 @@ class ExecuteDatasetUseCase:
         )
 
         if not has_date_token:
-            return [
-                f"{dataset.source_prefix.rstrip('/')}/"
-                f"{template.strip('/')}".strip("/")
+            prefix_parts = [
+                dataset.source_prefix.strip("/"),
+                template.strip("/"),
             ]
+            resolved_prefix = "/".join(
+                part for part in prefix_parts if part
+            )
+            return [f"{resolved_prefix}/" if resolved_prefix else ""]
 
         start_date = request.start_date or date.today()
         end_date = request.end_date or start_date
