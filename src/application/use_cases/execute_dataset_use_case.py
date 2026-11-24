@@ -18,6 +18,8 @@ from src.shared.logger import logger
 class ExecuteDatasetUseCase:
     """Coordinates the S3-to-SFTP transfer workflow."""
 
+    DATE_TOKEN = "{YYYY-MM-DD}"
+
     def __init__(
         self,
         dataset_repository: DatasetRepository,
@@ -72,21 +74,25 @@ class ExecuteDatasetUseCase:
             self._sftp_client.connect(credentials)
             connected = True
 
-            prefixes = self._resolve_prefixes(request, dataset)
-            for prefix in prefixes:
+            date_routes = self._resolve_date_routes(request, dataset)
+            for execution_date, source_prefix in date_routes:
                 files = self._storage_client.list_files(
                     bucket_name=dataset.source_bucket,
-                    prefix=prefix,
+                    prefix=source_prefix,
                     recursive=dataset.recursive,
                 )
                 logger.info(
                     "Found %s files in s3://%s/%s",
                     len(files),
                     dataset.source_bucket,
-                    prefix,
+                    source_prefix,
                 )
                 processed_files += len(files)
 
+                destination_path = self._resolve_destination_path(
+                    dataset,
+                    execution_date,
+                )
                 for source_file in files:
                     source_stream = self._storage_client.download(
                         source_file,
@@ -94,7 +100,7 @@ class ExecuteDatasetUseCase:
                     )
                     self._sftp_client.upload(
                         file_stream=source_stream,
-                        remote_path=dataset.remote_path,
+                        remote_path=destination_path,
                         filename=source_file.name,
                     )
                     uploaded_files += 1
@@ -135,56 +141,94 @@ class ExecuteDatasetUseCase:
     def _load_integration(self, dataset: Dataset) -> Integration:
         return self._integration_repository.get(dataset.integration)
 
-    @staticmethod
-    def _format_date_template(template: str, execution_date: date) -> str:
-        replacements = {
-            "{YYYY-MM-DD}": execution_date.strftime("%Y-%m-%d"),
-        }
-        result = template
-        for token, value in replacements.items():
-            result = result.replace(token, value)
-        return result
+    @classmethod
+    def _format_date_template(
+        cls,
+        template: str,
+        execution_date: date,
+    ) -> str:
+        return template.replace(
+            cls.DATE_TOKEN,
+            execution_date.strftime("%Y-%m-%d"),
+        )
 
-    def _resolve_prefixes(
+    @staticmethod
+    def _join_path(parts: list[str], trailing_slash: bool = False) -> str:
+        clean_parts = [part.strip("/") for part in parts if part and part.strip("/")]
+        joined = "/".join(clean_parts)
+        if parts and parts[0].startswith("/"):
+            joined = f"/{joined}" if joined else "/"
+        if trailing_slash and joined and not joined.endswith("/"):
+            joined += "/"
+        return joined
+
+    def _resolve_date_routes(
         self,
         request: ExecutionRequest,
         dataset: Dataset,
-    ) -> list[str]:
-        template = dataset.date_template or ""
-        has_date_token = "{YYYY-MM-DD}" in template
+    ) -> list[tuple[date | None, str]]:
+        source_template = dataset.source_date_template or ""
+        destination_template = dataset.destination_date_template or ""
+        has_source_date = self.DATE_TOKEN in source_template
+        has_destination_date = self.DATE_TOKEN in destination_template
 
-        if not has_date_token:
-            prefix_parts = [
-                dataset.source_prefix.strip("/"),
-                template.strip("/"),
-            ]
-            resolved_prefix = "/".join(
-                part for part in prefix_parts if part
+        if not has_source_date and not has_destination_date:
+            source_prefix = self._join_path(
+                [
+                    dataset.source_prefix,
+                    source_template,
+                    dataset.source_suffix,
+                ],
+                trailing_slash=True,
             )
-            return [f"{resolved_prefix}/" if resolved_prefix else ""]
+            return [(None, source_prefix)]
 
         start_date = request.start_date or date.today()
         end_date = request.end_date or start_date
         if end_date < start_date:
             raise ValueError("end_date cannot be earlier than start_date.")
 
-        prefixes = []
+        routes: list[tuple[date | None, str]] = []
         current = start_date
         while current <= end_date:
-            rendered_template = self._format_date_template(
-                template,
+            rendered_source_template = self._format_date_template(
+                source_template,
                 current,
-            ).strip("/")
-            prefix_parts = [
-                dataset.source_prefix.strip("/"),
-                rendered_template,
-            ]
-            prefixes.append(
-                "/".join(part for part in prefix_parts if part) + "/"
             )
+            source_prefix = self._join_path(
+                [
+                    dataset.source_prefix,
+                    rendered_source_template,
+                    dataset.source_suffix,
+                ],
+                trailing_slash=True,
+            )
+            routes.append((current, source_prefix))
             current += timedelta(days=1)
 
-        return prefixes
+        return routes
+
+    def _resolve_destination_path(
+        self,
+        dataset: Dataset,
+        execution_date: date | None,
+    ) -> str:
+        destination_template = dataset.destination_date_template or ""
+        if self.DATE_TOKEN in destination_template:
+            if execution_date is None:
+                raise ValueError(
+                    "An execution date is required for "
+                    "destination_date_template."
+                )
+            destination_template = self._format_date_template(
+                destination_template,
+                execution_date,
+            )
+
+        return self._join_path(
+            [dataset.remote_path, destination_template],
+            trailing_slash=True,
+        )
 
     def _generate_metadata(
         self,
