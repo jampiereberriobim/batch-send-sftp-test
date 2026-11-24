@@ -5,21 +5,19 @@ from src.domain.entities.remote_file import RemoteFile
 
 
 class StorageClient(ABC):
-    """
-    Contract for storing files.
-    """
+    """Port for reading files from source object storage."""
 
     @abstractmethod
-    def upload(
+    def list_files(
         self,
-        file_stream: BinaryIO,
-        remote_file: RemoteFile,
-        destination_prefix: str
-    ) -> str:
-        """
-        Uploads a file.
+        bucket_name: str,
+        prefix: str,
+        recursive: bool = False,
+    ) -> list[RemoteFile]:
+        """List files under a bucket prefix."""
+        raise NotImplementedError
 
-        Returns:
-            Object key.
-        """
-        pass
+    @abstractmethod
+    def download(self, remote_file: RemoteFile) -> BinaryIO:
+        """Download a source file as a binary stream."""
+        raise NotImplementedError
