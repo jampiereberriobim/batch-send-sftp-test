@@ -11,6 +11,7 @@ Configured through `INTEGRATION_TABLE`.
 - Partition key: `integration` (String)
 - Required attributes: `secret_name` (String), `enabled` (Boolean)
 - Optional attribute: `description` (String)
+- `secret_name` accepts either the Secrets Manager secret name or its full ARN.
 
 ### Dataset table
 
@@ -70,9 +71,27 @@ When `start_date` and `end_date` are omitted, the current date is used if date p
 - `recursive = false`: only files directly inside the resolved S3 prefix are transferred.
 - `recursive = true`: files in the resolved prefix and all nested folders are transferred.
 
-## Secrets Manager
+## Secrets Manager and SSH authentication
 
-The integration's `secret_name` references a Secrets Manager secret. The current provider expects the secret JSON to contain the `sftp_qa_2` property with `host`, `port`, `username`, and either `password` or `private_key`.
+The integration's `secret_name` references a Secrets Manager secret by name or full ARN.
+
+The secret must contain a JSON object with these fields:
+
+```json
+{
+  "host": "sftp.example.com",
+  "port": 22,
+  "username": "sftp_user",
+  "private_key": "-----BEGIN OPENSSH PRIVATE KEY-----\\n...\\n-----END OPENSSH PRIVATE KEY-----",
+  "private_key_passphrase": ""
+}
+```
+
+- Authentication uses the SSH private key through Paramiko; password authentication is not used.
+- `private_key_passphrase` is optional and is only required when the private key is encrypted.
+- The private key can contain real line breaks or escaped `\\n` sequences.
+- For compatibility, the provider also accepts the previous nested `sftp_qa_2` JSON structure, with the same fields inside it.
+- Supported private key types: Ed25519, RSA, and ECDSA.
 
 ## Environment variables
 
