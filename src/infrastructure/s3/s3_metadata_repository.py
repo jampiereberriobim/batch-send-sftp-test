@@ -1,3 +1,4 @@
+from datetime import datetime
 from io import BytesIO
 
 import pyarrow as pa
@@ -6,49 +7,37 @@ from botocore.client import BaseClient
 
 from src.domain.ports.metadata_repository import MetadataRepository
 from src.infrastructure.aws.s3_client import S3Client
-from datetime import datetime
+
 
 class S3MetadataRepository(MetadataRepository):
-    """
-    AWS S3 implementation of MetadataRepository.
-    """
+    """AWS S3 implementation of MetadataRepository."""
 
     def __init__(
         self,
         s3_client: S3Client,
         bucket_name: str,
-        metadata_prefix: str,
     ) -> None:
-
         self._client: BaseClient = s3_client.client
         self._bucket_name = bucket_name
-        self._metadata_prefix = metadata_prefix.rstrip("/")
 
-    def save(
-        self,
-        metadata: dict,
-    ) -> None:
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    def save(self, metadata: dict) -> None:
+        # Use the execution end time consistently for partitions and filename.
+        execution_time = datetime.fromisoformat(metadata["end_time"])
+        integration_name = metadata["integration"]
+        execution_id = str(metadata["execution_id"]).replace("-", "")[:8]
+        timestamp = execution_time.strftime("%Y%m%d%H%M%S")
+
         key = (
-            f"{self._metadata_prefix}/"
-            f"integration={metadata['integration']}/"
-            f"dataset={metadata['dataset']}/"
-            f"year={datetime.utcnow():%Y}/"
-            f"month={datetime.utcnow():%m}/"
-            f"day={datetime.utcnow():%d}/"
-            f"{timestamp}.parquet"
+            f"{integration_name}/"
+            f"year={execution_time.year}/"
+            f"month={execution_time.month}/"
+            f"day={execution_time.day}/"
+            f"{integration_name}_{execution_id}_{timestamp}.parquet"
         )
 
         table = pa.Table.from_pylist([metadata])
-
         buffer = BytesIO()
-
-        pq.write_table(
-            table,
-            buffer,
-            compression="snappy",
-        )
-
+        pq.write_table(table, buffer, compression="snappy")
         buffer.seek(0)
 
         self._client.upload_fileobj(
