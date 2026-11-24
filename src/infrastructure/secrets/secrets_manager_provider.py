@@ -21,7 +21,7 @@ class SecretsManagerProvider(SecretProvider):
         secret_payload = json.loads(response["SecretString"])
 
         # Support both the legacy nested structure and a direct JSON object.
-        credentials = secret_payload.get("sftp_qa_2", secret_payload)
+        credentials = secret_payload.get("sftp", secret_payload)
         if isinstance(credentials, str):
             credentials = json.loads(credentials)
 
