@@ -10,17 +10,24 @@ from src.shared.logger import logger
 
 
 class ParamikoSftpClient(SftpClient):
-    """Paramiko adapter for uploading files to an SFTP server."""
+    """Paramiko adapter using SSH private-key authentication."""
 
     def __init__(self) -> None:
         self._transport = None
         self._client = None
 
+    @staticmethod
     def _load_private_key(
-        self,
         key: str,
         passphrase: str | None = None,
     ):
+        # Secrets Manager may store line breaks as escaped \\n sequences.
+        normalized_key = (
+            key.replace("\\r\\n", "\\n")
+            .replace("\\n", "\n")
+            .strip()
+        )
+
         for key_cls in (
             paramiko.Ed25519Key,
             paramiko.RSAKey,
@@ -28,12 +35,16 @@ class ParamikoSftpClient(SftpClient):
         ):
             try:
                 return key_cls.from_private_key(
-                    StringIO(key),
+                    StringIO(normalized_key + "\\n"),
                     password=passphrase,
                 )
             except Exception:
                 continue
-        raise ValueError("Unsupported private key format.")
+
+        raise ValueError(
+            "Unsupported or invalid SSH private key format. "
+            "Expected an Ed25519, RSA, or ECDSA private key."
+        )
 
     def connect(self, credentials: SftpCredentials) -> None:
         logger.info(
@@ -41,27 +52,26 @@ class ParamikoSftpClient(SftpClient):
             credentials.host,
             credentials.port,
         )
+
         try:
+            if not credentials.private_key:
+                raise ValueError(
+                    "SSH private key is required for SFTP authentication."
+                )
+
+            private_key = self._load_private_key(
+                credentials.private_key,
+                credentials.private_key_passphrase,
+            )
+
             self._transport = paramiko.Transport(
                 (credentials.host, credentials.port)
             )
-
-            if credentials.private_key:
-                private_key = self._load_private_key(
-                    credentials.private_key,
-                    credentials.private_key_passphrase,
-                )
-                self._transport.connect(
-                    username=credentials.username,
-                    pkey=private_key,
-                )
-                logger.info("Authenticating with private key.")
-            else:
-                self._transport.connect(
-                    username=credentials.username,
-                    password=credentials.password,
-                )
-                logger.info("Authenticating with password.")
+            self._transport.connect(
+                username=credentials.username,
+                pkey=private_key,
+            )
+            logger.info("Authenticated to SFTP using SSH private key.")
 
             self._client = paramiko.SFTPClient.from_transport(
                 self._transport
