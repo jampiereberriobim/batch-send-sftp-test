@@ -90,7 +90,7 @@ SFTP/{report_name}/year={YYYY}/month={M}/day={D}/{report_name}_{execution_id}_{t
 
 ## S3 notification
 
-After all files are transferred successfully to SFTP, the batch writes one JSON notification to `NOTIFICATION_BUCKET`.
+At the end of every execution, whether the SFTP transfer succeeds or fails, the batch writes one JSON notification to `NOTIFICATION_BUCKET`. The JSON includes `status` with the execution result: `OK` or `ERROR`.
 
 Object key:
 
@@ -104,11 +104,12 @@ For the `transaction` dataset, the key is `NOTIFICACIONES/TRANSACTION/TRANSACTIO
 {
   "process_name": "TRANSACTION",
   "type": "SFTP",
-  "fecha": "2026-11-22"
+  "fecha": "2026-11-22",
+  "status": "OK"
 }
 ```
 
-The `fecha` value is the last date in the requested execution range (or the execution date when no range is supplied). The notification is not written when the SFTP transfer fails.
+The `fecha` value is the last date in the requested execution range (or the execution date when no range is supplied). For failed executions, the same object key is written with `"status": "ERROR"`. The notification write is attempted even when the transfer fails; an S3 write failure is logged and does not hide the original transfer error.
 
 ## Environment variables
 
