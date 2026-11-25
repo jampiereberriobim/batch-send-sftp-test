@@ -1,4 +1,5 @@
 from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 import uuid
 
 from src.application.dto.execution_request import ExecutionRequest
@@ -19,6 +20,7 @@ class ExecuteDatasetUseCase:
     """Coordinates the S3-to-SFTP transfer workflow."""
 
     DATE_TOKEN = "{YYYY-MM-DD}"
+    LIMA_TZ = ZoneInfo("America/Lima")
 
     def __init__(
         self,
@@ -48,6 +50,7 @@ class ExecuteDatasetUseCase:
 
         execution_id = str(uuid.uuid4())
         start_time = datetime.utcnow()
+        execution_date_peru = datetime.now(self.LIMA_TZ).date()
         processed_files = 0
         uploaded_files = 0
         status = "ERROR"
@@ -136,7 +139,7 @@ class ExecuteDatasetUseCase:
                 error_message=error_message,
             )
 
-            notification_date = start_time.date()
+            notification_date = execution_date_peru
             try:
                 self._notification_repository.save(
                     {
@@ -186,7 +189,12 @@ class ExecuteDatasetUseCase:
             )
             return [(None, source_prefix)]
 
-        start_date = request.start_date or date.today()
+        if dataset.date_offset < 0:
+            raise ValueError("date_offset cannot be negative.")
+
+        peru_today = datetime.now(self.LIMA_TZ).date()
+        default_date = peru_today - timedelta(days=dataset.date_offset)
+        start_date = request.start_date or default_date
         end_date = request.end_date or start_date
         if end_date < start_date:
             raise ValueError("end_date cannot be earlier than start_date.")
