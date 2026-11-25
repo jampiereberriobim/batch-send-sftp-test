@@ -12,6 +12,7 @@ from src.infrastructure.secrets.secrets_manager_provider import SecretsManagerPr
 from src.infrastructure.sftp.paramiko_sftp_client import ParamikoSftpClient
 from src.infrastructure.s3.s3_storage_client import S3StorageClient
 from src.infrastructure.s3.s3_metadata_repository import S3MetadataRepository
+from src.infrastructure.s3.s3_notification_repository import S3NotificationRepository
 
 
 dynamodb = DynamoDbClient()
@@ -32,6 +33,10 @@ metadata_repository = S3MetadataRepository(
     s3_client=s3,
     bucket_name=os.environ["METADATA_BUCKET"],
 )
+notification_repository = S3NotificationRepository(
+    s3_client=s3,
+    bucket_name=os.environ["NOTIFICATION_BUCKET"],
+)
 
 request = ExecutionRequest(
     integration=os.getenv("INTEGRATION", "compartamos_sftp"),
@@ -49,6 +54,7 @@ response = ExecuteDatasetUseCase(
     sftp_client,
     storage_client,
     metadata_repository,
+    notification_repository,
 ).execute(request)
 
 print(response)
