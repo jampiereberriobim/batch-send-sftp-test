@@ -10,6 +10,7 @@ from src.infrastructure.aws.secrets_manager_client import SecretsManagerClient
 from src.infrastructure.dynamodb.dataset_repository_impl import DatasetRepositoryImpl
 from src.infrastructure.dynamodb.integration_repository_impl import IntegrationRepositoryImpl
 from src.infrastructure.s3.s3_metadata_repository import S3MetadataRepository
+from src.infrastructure.s3.s3_notification_repository import S3NotificationRepository
 from src.infrastructure.s3.s3_storage_client import S3StorageClient
 from src.infrastructure.secrets.secrets_manager_provider import SecretsManagerProvider
 from src.infrastructure.sftp.paramiko_sftp_client import ParamikoSftpClient
@@ -39,6 +40,10 @@ def lambda_handler(event, context):
         s3_client=s3,
         bucket_name=os.environ["METADATA_BUCKET"],
     )
+    notification_repository = S3NotificationRepository(
+        s3_client=s3,
+        bucket_name=os.environ["NOTIFICATION_BUCKET"],
+    )
 
     use_case = ExecuteDatasetUseCase(
         dataset_repository=dataset_repository,
@@ -47,6 +52,7 @@ def lambda_handler(event, context):
         sftp_client=sftp_client,
         storage_client=storage_client,
         metadata_repository=metadata_repository,
+        notification_repository=notification_repository,
     )
 
     request = ExecutionRequest(
