@@ -109,7 +109,7 @@ For the `transaction` dataset, the key is `NOTIFICACIONES/TRANSACTION/TRANSACTIO
 }
 ```
 
-The `fecha` value is the last date in the requested execution range (or the execution date when no range is supplied). For failed executions, the same object key is written with `"status": "ERROR"`. The notification write is attempted even when the transfer fails; an S3 write failure is logged and does not hide the original transfer error.
+The `fecha` value is always the date when the batch execution started, regardless of the `start_date` or `end_date` requested for the files. For failed executions, the same object key is written with `"status": "ERROR"`. The notification write is attempted even when the transfer fails; an S3 write failure is logged and does not hide the original transfer error.
 
 ## Environment variables
 
