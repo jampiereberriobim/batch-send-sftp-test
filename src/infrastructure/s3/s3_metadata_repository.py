@@ -23,16 +23,16 @@ class S3MetadataRepository(MetadataRepository):
     def save(self, metadata: dict) -> None:
         # Use the execution end time consistently for partitions and filename.
         execution_time = datetime.fromisoformat(metadata["end_time"])
-        integration_name = metadata["integration"]
+        report_name = metadata["report_name"]
         execution_id = str(metadata["execution_id"]).replace("-", "")[:8]
         timestamp = execution_time.strftime("%Y%m%d%H%M%S")
 
         key = (
-            f"{integration_name}/"
+            f"SFTP/{report_name}/"
             f"year={execution_time.year}/"
             f"month={execution_time.month}/"
             f"day={execution_time.day}/"
-            f"{integration_name}_{execution_id}_{timestamp}.parquet"
+            f"{report_name}_{execution_id}_{timestamp}.parquet"
         )
 
         table = pa.Table.from_pylist([metadata])

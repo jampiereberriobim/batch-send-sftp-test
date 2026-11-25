@@ -105,7 +105,7 @@ class ExecuteDatasetUseCase:
                     )
                     uploaded_files += 1
 
-            status = "SUCCESS"
+            status = "OK"
             return ExecutionResponse(
                 integration=request.integration,
                 dataset=request.dataset,
