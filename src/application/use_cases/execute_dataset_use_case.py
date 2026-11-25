@@ -136,12 +136,7 @@ class ExecuteDatasetUseCase:
                 error_message=error_message,
             )
 
-            notification_date = (
-                (date_routes[-1][0] if date_routes else None)
-                or request.end_date
-                or request.start_date
-                or start_time.date()
-            )
+            notification_date = start_time.date()
             try:
                 self._notification_repository.save(
                     {
