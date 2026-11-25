@@ -5,10 +5,10 @@ from src.application.dto.execution_request import ExecutionRequest
 from src.application.dto.execution_response import ExecutionResponse
 from src.domain.entities.dataset import Dataset
 from src.domain.entities.integration import Integration
-from src.domain.entities.sftp_credentials import SftpCredentials
 from src.domain.ports.dataset_repository import DatasetRepository
 from src.domain.ports.integration_repository import IntegrationRepository
 from src.domain.ports.metadata_repository import MetadataRepository
+from src.domain.ports.notification_repository import NotificationRepository
 from src.domain.ports.secret_provider import SecretProvider
 from src.domain.ports.sftp_client import SftpClient
 from src.domain.ports.storage_client import StorageClient
@@ -28,6 +28,7 @@ class ExecuteDatasetUseCase:
         sftp_client: SftpClient,
         storage_client: StorageClient,
         metadata_repository: MetadataRepository,
+        notification_repository: NotificationRepository,
     ) -> None:
         self._dataset_repository = dataset_repository
         self._integration_repository = integration_repository
@@ -35,6 +36,7 @@ class ExecuteDatasetUseCase:
         self._sftp_client = sftp_client
         self._storage_client = storage_client
         self._metadata_repository = metadata_repository
+        self._notification_repository = notification_repository
 
     def execute(self, request: ExecutionRequest) -> ExecutionResponse:
         logger.info("Starting S3-to-SFTP execution")
@@ -58,9 +60,7 @@ class ExecuteDatasetUseCase:
                 dataset=request.dataset,
             )
             if not dataset.enabled:
-                raise ValueError(
-                    f"Dataset '{request.dataset}' is disabled."
-                )
+                raise ValueError(f"Dataset '{request.dataset}' is disabled.")
 
             integration = self._load_integration(dataset)
             if not integration.enabled:
@@ -68,9 +68,7 @@ class ExecuteDatasetUseCase:
                     f"Integration '{integration.name}' is disabled."
                 )
 
-            credentials = self._secret_provider.get_secret(
-                integration.secret_name
-            )
+            credentials = self._secret_provider.get_secret(integration.secret_name)
             self._sftp_client.connect(credentials)
             connected = True
 
@@ -90,8 +88,7 @@ class ExecuteDatasetUseCase:
                 processed_files += len(files)
 
                 destination_path = self._resolve_destination_path(
-                    dataset,
-                    execution_date,
+                    dataset, execution_date
                 )
                 for source_file in files:
                     source_stream = self._storage_client.download(
@@ -104,6 +101,20 @@ class ExecuteDatasetUseCase:
                         filename=source_file.name,
                     )
                     uploaded_files += 1
+
+            notification_date = (
+                date_routes[-1][0]
+                or request.end_date
+                or request.start_date
+                or start_time.date()
+            )
+            self._notification_repository.save(
+                {
+                    "process_name": request.dataset.upper(),
+                    "type": "SFTP",
+                    "fecha": notification_date.isoformat(),
+                }
+            )
 
             status = "OK"
             return ExecutionResponse(
@@ -142,11 +153,7 @@ class ExecuteDatasetUseCase:
         return self._integration_repository.get(dataset.integration)
 
     @classmethod
-    def _format_date_template(
-        cls,
-        template: str,
-        execution_date: date,
-    ) -> str:
+    def _format_date_template(cls, template: str, execution_date: date) -> str:
         return template.replace(
             cls.DATE_TOKEN,
             execution_date.strftime("%Y-%m-%d"),
@@ -154,7 +161,9 @@ class ExecuteDatasetUseCase:
 
     @staticmethod
     def _join_path(parts: list[str], trailing_slash: bool = False) -> str:
-        clean_parts = [part.strip("/") for part in parts if part and part.strip("/")]
+        clean_parts = [
+            part.strip("/") for part in parts if part and part.strip("/")
+        ]
         joined = "/".join(clean_parts)
         if parts and parts[0].startswith("/"):
             joined = f"/{joined}" if joined else "/"
@@ -163,9 +172,7 @@ class ExecuteDatasetUseCase:
         return joined
 
     def _resolve_date_routes(
-        self,
-        request: ExecutionRequest,
-        dataset: Dataset,
+        self, request: ExecutionRequest, dataset: Dataset
     ) -> list[tuple[date | None, str]]:
         source_template = dataset.source_date_template or ""
         destination_template = dataset.destination_date_template or ""
@@ -174,11 +181,7 @@ class ExecuteDatasetUseCase:
 
         if not has_source_date and not has_destination_date:
             source_prefix = self._join_path(
-                [
-                    dataset.source_prefix,
-                    source_template,
-                    dataset.source_suffix,
-                ],
+                [dataset.source_prefix, source_template, dataset.source_suffix],
                 trailing_slash=True,
             )
             return [(None, source_prefix)]
@@ -192,8 +195,7 @@ class ExecuteDatasetUseCase:
         current = start_date
         while current <= end_date:
             rendered_source_template = self._format_date_template(
-                source_template,
-                current,
+                source_template, current
             )
             source_prefix = self._join_path(
                 [
@@ -205,26 +207,20 @@ class ExecuteDatasetUseCase:
             )
             routes.append((current, source_prefix))
             current += timedelta(days=1)
-
         return routes
 
     def _resolve_destination_path(
-        self,
-        dataset: Dataset,
-        execution_date: date | None,
+        self, dataset: Dataset, execution_date: date | None
     ) -> str:
         destination_template = dataset.destination_date_template or ""
         if self.DATE_TOKEN in destination_template:
             if execution_date is None:
                 raise ValueError(
-                    "An execution date is required for "
-                    "destination_date_template."
+                    "An execution date is required for destination_date_template."
                 )
             destination_template = self._format_date_template(
-                destination_template,
-                execution_date,
+                destination_template, execution_date
             )
-
         return self._join_path(
             [dataset.remote_path, destination_template],
             trailing_slash=True,
