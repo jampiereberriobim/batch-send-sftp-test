@@ -38,4 +38,5 @@ class DatasetRepositoryImpl(DatasetRepository):
                 "destination_date_template", ""
             ),
             recursive=item.get("recursive", False),
+            date_offset=int(item.get("date_offset", 0)),
         )
