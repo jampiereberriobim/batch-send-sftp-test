@@ -15,3 +15,4 @@ class Dataset:
     source_suffix: str = ""
     destination_date_template: str = ""
     recursive: bool = False
+    date_offset: int = 0
