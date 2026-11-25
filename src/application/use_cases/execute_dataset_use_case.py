@@ -53,6 +53,7 @@ class ExecuteDatasetUseCase:
         status = "ERROR"
         error_message = None
         connected = False
+        date_routes: list[tuple[date | None, str]] = []
 
         try:
             dataset = self._dataset_repository.get(
@@ -102,20 +103,6 @@ class ExecuteDatasetUseCase:
                     )
                     uploaded_files += 1
 
-            notification_date = (
-                date_routes[-1][0]
-                or request.end_date
-                or request.start_date
-                or start_time.date()
-            )
-            self._notification_repository.save(
-                {
-                    "process_name": request.dataset.upper(),
-                    "type": "SFTP",
-                    "fecha": notification_date.isoformat(),
-                }
-            )
-
             status = "OK"
             return ExecutionResponse(
                 integration=request.integration,
@@ -148,6 +135,24 @@ class ExecuteDatasetUseCase:
                 status=status,
                 error_message=error_message,
             )
+
+            notification_date = (
+                (date_routes[-1][0] if date_routes else None)
+                or request.end_date
+                or request.start_date
+                or start_time.date()
+            )
+            try:
+                self._notification_repository.save(
+                    {
+                        "process_name": request.dataset.upper(),
+                        "type": "SFTP",
+                        "fecha": notification_date.isoformat(),
+                        "status": status,
+                    }
+                )
+            except Exception:
+                logger.exception("Failed to save S3 process notification.")
 
     def _load_integration(self, dataset: Dataset) -> Integration:
         return self._integration_repository.get(dataset.integration)
