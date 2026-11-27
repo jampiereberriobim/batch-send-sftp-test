@@ -7,8 +7,7 @@ from src.entrypoints.lambda_handler import lambda_handler
 def main() -> None:
     if len(sys.argv) != 2:
         raise SystemExit(
-            'Usage: python -m src.entrypoints.batch_handler '
-            ''<event-json>''
+            "Usage: python -m src.entrypoints.batch_handler '<event-json>'"
         )
 
     try:
