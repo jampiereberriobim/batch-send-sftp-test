@@ -1,18 +1,15 @@
-FROM public.ecr.aws/lambda/python:3.12
+FROM python:3.12-slim
+
+WORKDIR /app
+
+ENV PYTHONUNBUFFERED=1
 
 COPY requirements.txt .
-
-RUN pip install \
+RUN pip install --no-cache-dir \
     --trusted-host pypi.org \
     --trusted-host files.pythonhosted.org \
-    -r requirements.txt \
-    --target "${LAMBDA_TASK_ROOT}"
+    -r requirements.txt
 
-COPY src/ ${LAMBDA_TASK_ROOT}/src/
+COPY src/ ./src/
 
-ENV DATASET_TABLE=""
-ENV INTEGRATION_TABLE=""
-ENV METADATA_BUCKET=""
-ENV METADATA_PREFIX=""
-
-CMD ["src.entrypoints.lambda_handler.lambda_handler"]
+CMD ["python", "-m", "src.entrypoints.batch_handler"]
