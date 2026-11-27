@@ -1,6 +1,6 @@
 # S3 to SFTP integration
 
-Transfers files from an Amazon S3 prefix to a remote SFTP directory using a hexagonal architecture.
+Transfers files from an Amazon S3 prefix to a remote SFTP directory using a hexagonal architecture. The container is designed to run as an AWS Batch job.
 
 ## DynamoDB configuration
 
@@ -119,25 +119,54 @@ The `fecha` value is always the date when the batch execution started in Peru (`
 - `METADATA_BUCKET`: S3 bucket for execution metadata.
 - `NOTIFICATION_BUCKET`: S3 bucket for process notification JSON files.
 
-`date_offset` is an optional numeric attribute in the DynamoDB dataset item. It defaults to `0` when omitted.
+AWS credentials and region use the standard boto3 credential provider chain. For AWS Batch, attach an appropriate Job Role to the job definition; do not bake credentials into the image.
 
-AWS credentials and region use the standard boto3 credential provider chain.
+## AWS Batch execution
 
-## Local execution
-
-Set the required environment variables and optional `INTEGRATION`, `DATASET`, `START_DATE`, and `END_DATE` variables, then run:
+The container command is:
 
 ```bash
-python test_local.py
+python -m src.entrypoints.batch_handler '<event-json>'
 ```
 
-## Execution event
+Example event:
 
 ```json
 {
   "integration": "compartamos_sftp",
-  "dataset": "transaction",
+  "dataset": "TRANSACTION",
   "start_date": "2026-11-22",
-  "end_date": "2026-11-24"
+  "end_date": "2026-11-22"
 }
+```
+
+The dates are optional. If omitted, the application resolves the execution date using the dataset's `date_offset` and the Peru timezone.
+
+Configure the following environment variables in the AWS Batch job definition:
+
+- `DATASET_TABLE`
+- `INTEGRATION_TABLE`
+- `METADATA_BUCKET`
+- `NOTIFICATION_BUCKET`
+
+Pass the event JSON as the container command override. The process exits with code `0` when the use case completes successfully. An unhandled execution error causes a non-zero exit code so AWS Batch marks the job as failed.
+
+## Build and run locally
+
+Build the image:
+
+```bash
+docker build -t analyticssftp-send-batch:latest .
+```
+
+Run a job locally (the machine must have AWS credentials and network access to the required AWS services and SFTP host):
+
+```bash
+docker run --rm \
+  -e DATASET_TABLE="sftp_delivery_dataset" \
+  -e INTEGRATION_TABLE="sftp_delivery_integration" \
+  -e METADATA_BUCKET="qa-datalake-metadata-zone-992382450203" \
+  -e NOTIFICATION_BUCKET="qa-datalake-silver-zone-temp-992382450203" \
+  analyticssftp-send-batch:latest \
+  '{"integration":"compartamos_sftp","dataset":"TRANSACTION","start_date":"2026-11-22","end_date":"2026-11-22"}'
 ```
